@@ -2,3 +2,5 @@
 *.iml
 /naps2.console/testpdf.pdf
 /naps2.console/scanned.pdf
+/naps2.console/dist/
+/naps2.console/build/

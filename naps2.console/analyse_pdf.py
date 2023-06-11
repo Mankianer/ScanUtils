@@ -1,7 +1,7 @@
 import io
 import shutil
 import subprocess
-
+import sys
 from pdfminer.converter import TextConverter
 from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.pdfinterp import PDFResourceManager
@@ -12,11 +12,18 @@ from fuzzywuzzy import fuzz
 import json
 import argparse
 
+
+def exit_with_error(error_message: str = "Ein Fehler ist aufgetreten."):
+    print(error_message)
+    input("Drücke Enter, um das Programm zu beenden.")
+    sys.exit(1)
+
+
 # TODO: create system init (openai api Key, Document folder, etc.)
 # check naps2 installation
 if shutil.which("naps2.console") is None:
     print('Der Befehl "naps2.console" wurde nicht gefunden. Bitte installieren Sie NAPS2.')
-    exit(1)
+    exit_with_error()
 
 # load openai api key
 openaiKeyPath = os.path.expanduser('~/.scanner_utils/openai')
@@ -25,7 +32,7 @@ with open(openaiKeyPath, 'r') as datei:
 # check if key is present
 if openaiKey == "":
     print(f"OpenAI API Key not found. Please enter it in openaiKeyPath: {openaiKeyPath}")
-    exit(1)
+    exit_with_error()
 # TODO: check if key is valid
 openai.api_key = openaiKey
 
@@ -153,7 +160,7 @@ def analyse_and_move_pdf(dokumente_folder: str, target_pdf: str):
         move_pdf2docs(dokumente_folder, gpt_answer, target_pdf)
     else:
         print("Die Antowrt von ChatGPT konnte nicht als JSON verarbeitet werden!")
-        exit(1)
+        exit_with_error()
 
 
 def move_pdf2docs(dokumente_folder, gpt_answer, target_pdf):
@@ -162,7 +169,7 @@ def move_pdf2docs(dokumente_folder, gpt_answer, target_pdf):
     if not os.path.exists(target_folder):
         print(
             f"Der Ordner {target_folder} existiert nicht! ChatGPT hat eine Kateogrie vorgeschlagen, die nicht existiert.")
-        exit(1)
+        exit_with_error()
     target_file = os.path.join(target_folder, gpt_answer["Titel"])
     # validiere ob target_file mit .pdf endet
     if not target_file.endswith(".pdf"):
@@ -171,7 +178,7 @@ def move_pdf2docs(dokumente_folder, gpt_answer, target_pdf):
     # validiere ob target_file bereits existiert
     if os.path.exists(target_file):
         print(f"Die Datei {target_file} existiert bereits! Bitte wählen Sie einen anderen Titel.")
-        exit(1)
+        exit_with_error("Die Datei existiert bereits! - Fehler von ChatGPT oder Document wirklich schon vorhanden?")
     # verschiebe pdf in target_file
     shutil.move(target_pdf, target_file)
     print(f"Die Datei {target_file} wurde erfolgreich verschoben!")
@@ -182,7 +189,7 @@ def scanpdf(scanned_pdf_path: str, naps2_profile: str = 'CANON P-208II'):
     exit_code = run_command(command)
     if exit_code != 0:
         print("Fehler beim Scannen der PDF-Datei.")
-        exit(1)
+        exit_with_error()
 
 
 def ocr_scan(pdf_path: str):
@@ -190,7 +197,7 @@ def ocr_scan(pdf_path: str):
     exit_code = run_command(command)
     if exit_code != 0:
         print("Fehler beim Scannen der PDF-Datei.")
-        exit(1)
+        exit_with_error()
 
 
 def run_command(command: str):
@@ -236,3 +243,4 @@ if __name__ == '__main__':
     for pdf_file in pdf_files:
         print(pdf_file)
         process_pdf(pdf_file, document_folder)
+    input("Drücke Enter, um das Programm zu beenden.")
