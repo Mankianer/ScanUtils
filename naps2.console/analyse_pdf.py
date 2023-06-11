@@ -1,13 +1,14 @@
 import io
+import shutil
+
 from pdfminer.converter import TextConverter
 from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.pdfinterp import PDFResourceManager
 from pdfminer.pdfpage import PDFPage
 import os
 import openai
-import collections
-from typing import List, Dict
 from fuzzywuzzy import fuzz
+import json
 
 # load openai api key
 openaiKeyPath = os.path.expanduser('~/.scanner_utils/openai')
@@ -92,9 +93,21 @@ def remove_similar(files, num_files):
                              file1 != most_similar_file and file2 != most_similar_file}
 
 
+def validiere_json(json_string):
+    try:
+        daten = json.loads(json_string)
+        return daten
+    except json.JSONDecodeError:
+        print("Ungültiges JSON.")
+        return None
+
+
 if __name__ == '__main__':
-    kategories_prompt = find_most_frequent_files('G:/Meine Ablage/Dokumente')
-    pdf_text = extract_text_from_pdf('testpdf.pdf')
+    dokumente_folder = 'G:/Meine Ablage/Dokumente'
+    target_pdf = 'testpdf.pdf'
+
+    kategories_prompt = find_most_frequent_files(dokumente_folder)
+    pdf_text = extract_text_from_pdf(target_pdf)
     # erstelle prompt
     system_prompt = f"""
     Wähle ein passenden Titel mit Zeitangabe, um die PDF in einem Dateisystem zu ordnen zu können und Ordne der PDF eine der Kategorien zu!
@@ -109,4 +122,30 @@ if __name__ == '__main__':
                                                    messages=[{"role": "system", "content": system_prompt},
                                                              {"role": "user", "content": f"PDF:{pdf_text}"}])
     print("Chatausgabe:")
-    print(chat_completion.choices[0].message.content)
+    gpt_answer_json = chat_completion.choices[0].message.content
+    print(gpt_answer_json)
+    # validiere json
+    gpt_answer = validiere_json(gpt_answer_json)
+
+    if gpt_answer is not None:
+        target_folder = os.path.join(dokumente_folder, gpt_answer["Kategorie"])
+        # validiere ob target_folder existiert
+        if not os.path.exists(target_folder):
+            print(
+                f"Der Ordner {target_folder} existiert nicht! ChatGPT hat eine Kateogrie vorgeschlagen, die nicht existiert.")
+            exit(1)
+        target_file = os.path.join(target_folder, gpt_answer["Titel"])
+        # validiere ob target_file mit .pdf endet
+        if not target_file.endswith(".pdf"):
+            target_file = target_file + ".pdf"
+        print("target_file:", target_file)
+        # validiere ob target_file bereits existiert
+        if os.path.exists(target_file):
+            print(f"Die Datei {target_file} existiert bereits! Bitte wählen Sie einen anderen Titel.")
+            exit(1)
+        # verschiebe pdf in target_file
+        shutil.move(target_pdf, target_file)
+        print(f"Die Datei {target_file} wurde erfolgreich verschoben!")
+
+    else:
+        print("Die Antowrt von ChatGPT konnte nicht als JSON verarbeitet werden!")
