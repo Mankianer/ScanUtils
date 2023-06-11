@@ -125,9 +125,17 @@ def validiere_json(json_string):
 
 def prompt_by_pdf_text(pdf_text: str, categories_prompt: str) -> str:
     system_prompt = f"""
-            Wähle ein passenden Titel mit Zeitangabe, um die PDF in einem Dateisystem zu ordnen zu können und Ordne der PDF eine der Kategorien zu!
+            Wähle ein passenden Titel für die PDF.
+            Der Titel soll gut für Menschen lesbar sein.
+            Der Titel soll eine Zeitangabe enthalten. 
+            Der Titel muss als Dateiname valide sein.
+            Der Titel soll maximal 80 Zeichen lang sein.
+            
+            Ordne der PDF eine der folgenden Kategorien zu!
             {categories_prompt}
-            Antworte im Json-Format mit den Eigenschaften Titel und Kategorie."
+            
+            Antworte im Json-Format mit den Eigenschaften Titel und Kategorie! 
+            Wenn keine passende Kategorie vorhanden ist, soll eine Warnung ausgegeben werden.
             """
 
     # sende prompt an openai
@@ -170,7 +178,8 @@ def move_pdf2docs(dokumente_folder, gpt_answer, target_pdf):
         print(
             f"Der Ordner {target_folder} existiert nicht! ChatGPT hat eine Kateogrie vorgeschlagen, die nicht existiert.")
         exit_with_error()
-    target_file = os.path.join(target_folder, gpt_answer["Titel"])
+    titel_ = gpt_answer["Titel"].replace("/", "_").replace("\\", "_")
+    target_file = os.path.join(target_folder, titel_)
     # validiere ob target_file mit .pdf endet
     if not target_file.endswith(".pdf"):
         target_file = target_file + ".pdf"
