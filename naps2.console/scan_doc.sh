@@ -1,6 +1,8 @@
 
 # TODO: Add a check if the scanner is available
-# TODO: Use TEMP folder for pdfs
-naps2.console -o "G:\Meine Ablage\Dokumente\Scans\test_\$(nnn)_\$(YY)-\$(MM)-\$(DD).pdf" -p "CANON P-208II" --ocrlang "ger" --enableocr
+
+# remove scanned.pdf if it exists
+
+naps2.console -o "scanned.pdf" -p "CANON P-208II" --force --enableocr
 
 # Scan Inhalt der PDF und Sortiere in Kategorie ein

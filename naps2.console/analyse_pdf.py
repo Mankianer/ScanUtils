@@ -1,5 +1,6 @@
 import io
 import shutil
+import subprocess
 
 from pdfminer.converter import TextConverter
 from pdfminer.pdfinterp import PDFPageInterpreter
@@ -102,50 +103,82 @@ def validiere_json(json_string):
         return None
 
 
-if __name__ == '__main__':
-    dokumente_folder = 'G:/Meine Ablage/Dokumente'
-    target_pdf = 'testpdf.pdf'
-
-    kategories_prompt = find_most_frequent_files(dokumente_folder)
-    pdf_text = extract_text_from_pdf(target_pdf)
-    # erstelle prompt
+def prompt_by_pdf_text(pdf_text: str, categories_prompt: str) -> str:
     system_prompt = f"""
-    Wähle ein passenden Titel mit Zeitangabe, um die PDF in einem Dateisystem zu ordnen zu können und Ordne der PDF eine der Kategorien zu!
-    {kategories_prompt}
-    Antworte im Json-Format mit den Eigenschaften Titel und Kategorie."
-    """
-    print("Prompt:")
-    print(system_prompt)
+            Wähle ein passenden Titel mit Zeitangabe, um die PDF in einem Dateisystem zu ordnen zu können und Ordne der PDF eine der Kategorien zu!
+            {categories_prompt}
+            Antworte im Json-Format mit den Eigenschaften Titel und Kategorie."
+            """
 
     # sende prompt an openai
     chat_completion = openai.ChatCompletion.create(model="gpt-3.5-turbo",
                                                    messages=[{"role": "system", "content": system_prompt},
                                                              {"role": "user", "content": f"PDF:{pdf_text}"}])
+    return chat_completion.choices[0].message.content
+
+
+def analyse_and_move_pdf(dokumente_folder: str, target_pdf: str):
+    # get Kategories und Dateien-Beispiele
+    print("Kategorien:")
+    categories_prompt = find_most_frequent_files(dokumente_folder)
+    print(categories_prompt)
+
+    # get pdf text
+    print("pdf_text:")
+    pdf_text = extract_text_from_pdf(target_pdf)
+    print(pdf_text)
+
+    # get gpt answer
     print("Chatausgabe:")
-    gpt_answer_json = chat_completion.choices[0].message.content
+    gpt_answer_json = prompt_by_pdf_text(pdf_text, categories_prompt)
     print(gpt_answer_json)
     # validiere json
     gpt_answer = validiere_json(gpt_answer_json)
 
     if gpt_answer is not None:
-        target_folder = os.path.join(dokumente_folder, gpt_answer["Kategorie"])
-        # validiere ob target_folder existiert
-        if not os.path.exists(target_folder):
-            print(
-                f"Der Ordner {target_folder} existiert nicht! ChatGPT hat eine Kateogrie vorgeschlagen, die nicht existiert.")
-            exit(1)
-        target_file = os.path.join(target_folder, gpt_answer["Titel"])
-        # validiere ob target_file mit .pdf endet
-        if not target_file.endswith(".pdf"):
-            target_file = target_file + ".pdf"
-        print("target_file:", target_file)
-        # validiere ob target_file bereits existiert
-        if os.path.exists(target_file):
-            print(f"Die Datei {target_file} existiert bereits! Bitte wählen Sie einen anderen Titel.")
-            exit(1)
-        # verschiebe pdf in target_file
-        shutil.move(target_pdf, target_file)
-        print(f"Die Datei {target_file} wurde erfolgreich verschoben!")
-
+        # if gpt_answer is valid, move pdf to folder
+        move_pdf2docs(dokumente_folder, gpt_answer, target_pdf)
     else:
         print("Die Antowrt von ChatGPT konnte nicht als JSON verarbeitet werden!")
+        exit(1)
+
+
+def move_pdf2docs(dokumente_folder, gpt_answer, target_pdf):
+    target_folder = os.path.join(dokumente_folder, gpt_answer["Kategorie"])
+    # validiere ob target_folder existiert
+    if not os.path.exists(target_folder):
+        print(
+            f"Der Ordner {target_folder} existiert nicht! ChatGPT hat eine Kateogrie vorgeschlagen, die nicht existiert.")
+        exit(1)
+    target_file = os.path.join(target_folder, gpt_answer["Titel"])
+    # validiere ob target_file mit .pdf endet
+    if not target_file.endswith(".pdf"):
+        target_file = target_file + ".pdf"
+    print("target_file:", target_file)
+    # validiere ob target_file bereits existiert
+    if os.path.exists(target_file):
+        print(f"Die Datei {target_file} existiert bereits! Bitte wählen Sie einen anderen Titel.")
+        exit(1)
+    # verschiebe pdf in target_file
+    shutil.move(target_pdf, target_file)
+    print(f"Die Datei {target_file} wurde erfolgreich verschoben!")
+
+
+def scanpdf(scanned_pdf_path: str, naps2_profile: str = 'CANON P-208II'):
+
+    # Prüfen, ob der Befehl 'naps2.console' existiert
+    if shutil.which("naps2.console") is not None:
+        # Befehl existiert, also führen wir ihn aus
+        command = 'naps2.console -o "%s" -p "%s" --force --enableocr' % (scanned_pdf_path, naps2_profile)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+        process.wait()
+    else:
+        # Befehl existiert nicht, also geben wir eine Fehlermeldung aus
+        print('Der Befehl "naps2.console" wurde nicht gefunden. Bitte installieren Sie NAPS2.')
+
+
+if __name__ == '__main__':
+    dokumente_folder = 'G:/Meine Ablage/Dokumente'
+    target_pdf = 'scanned.pdf'
+    scanpdf(target_pdf)
+    analyse_and_move_pdf(dokumente_folder, target_pdf)
