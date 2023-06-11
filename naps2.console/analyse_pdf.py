@@ -10,6 +10,13 @@ import os
 import openai
 from fuzzywuzzy import fuzz
 import json
+import argparse
+
+# TODO: create system init (openai api Key, Document folder, etc.)
+# check naps2 installation
+if shutil.which("naps2.console") is None:
+    print('Der Befehl "naps2.console" wurde nicht gefunden. Bitte installieren Sie NAPS2.')
+    exit(1)
 
 # load openai api key
 openaiKeyPath = os.path.expanduser('~/.scanner_utils/openai')
@@ -19,7 +26,13 @@ with open(openaiKeyPath, 'r') as datei:
 if openaiKey == "":
     print(f"OpenAI API Key not found. Please enter it in openaiKeyPath: {openaiKeyPath}")
     exit(1)
+# TODO: check if key is valid
 openai.api_key = openaiKey
+
+# load document folder
+document_folder = os.path.expanduser('~/.scanner_utils/docs_path')
+with open(document_folder, 'r') as datei:
+    document_folder = datei.read()
 
 
 def extract_text_from_pdf(pdf_path):
@@ -165,20 +178,61 @@ def move_pdf2docs(dokumente_folder, gpt_answer, target_pdf):
 
 
 def scanpdf(scanned_pdf_path: str, naps2_profile: str = 'CANON P-208II'):
+    command = 'naps2.console -o "%s" -p "%s" --force --enableocr' % (scanned_pdf_path, naps2_profile)
+    exit_code = run_command(command)
+    if exit_code != 0:
+        print("Fehler beim Scannen der PDF-Datei.")
+        exit(1)
 
-    # Prüfen, ob der Befehl 'naps2.console' existiert
-    if shutil.which("naps2.console") is not None:
-        # Befehl existiert, also führen wir ihn aus
-        command = 'naps2.console -o "%s" -p "%s" --force --enableocr' % (scanned_pdf_path, naps2_profile)
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
-        process.wait()
-    else:
-        # Befehl existiert nicht, also geben wir eine Fehlermeldung aus
-        print('Der Befehl "naps2.console" wurde nicht gefunden. Bitte installieren Sie NAPS2.')
+
+def ocr_scan(pdf_path: str):
+    command = 'naps2.console -n 0 -i "%s" -o "%s" --enableocr --force' % (pdf_path, pdf_path)
+    exit_code = run_command(command)
+    if exit_code != 0:
+        print("Fehler beim Scannen der PDF-Datei.")
+        exit(1)
+
+
+def run_command(command: str):
+    try:
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+
+        if process.returncode != 0:
+            print(f"Fehler beim Ausführen des Befehls: {command}")
+            print(f"Fehlerausgabe: {stderr.decode('utf-8')}")
+
+        return process.returncode
+    except Exception as e:
+        print(f"Ausnahme beim Ausführen des Befehls: {command}")
+        print(f"Ausnahmedetails: {str(e)}")
+        return -1
+
+
+def get_pdfs_by_args():
+    # Erstellen Sie den Parser
+    parser = argparse.ArgumentParser(description='PDF-Dateien die verarbeitet werden sollen.')
+    # Fügen Sie die Argumente hinzu
+    parser.add_argument('pdf_files', metavar='P', type=str, nargs='+',
+                        help='ein Pfad zu einer Datei')
+    # Parsen Sie die Argumente
+    args = parser.parse_args()
+
+    # Jetzt können Sie auf die Dateipfade zugreifen über args.Dateipfade, das ist eine Liste von Strings
+    return args.pdf_files
+
+
+def process_pdf(pdf_file: str, dokumente_folder: str):
+    print("OCR-Scan wird gestartet...")
+    ocr_scan(pdf_file)
+    # TODO: Frage ob PDF sensibel ist => wenn ja passwort setzen & nicht gpt => manuelle eingabe von titel und kategorie
+    analyse_and_move_pdf(dokumente_folder, pdf_file)
 
 
 if __name__ == '__main__':
-    dokumente_folder = 'G:/Meine Ablage/Dokumente'
-    target_pdf = 'scanned.pdf'
-    scanpdf(target_pdf)
-    analyse_and_move_pdf(dokumente_folder, target_pdf)
+    # read arguments
+    pdf_files = get_pdfs_by_args()
+    # process pdfs
+    for pdf_file in pdf_files:
+        print(pdf_file)
+        process_pdf(pdf_file, document_folder)
