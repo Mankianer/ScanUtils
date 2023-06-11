@@ -86,7 +86,7 @@ def find_most_frequent_files(directory: str, num_files: int = 10) -> str:
             results[category] = ['"' + file + '"' for file in files]
 
     # Formatiert die Ergebnisse als String
-    result_string = "Kategorie: \"Datei1\",\"Datei2\",\"Datei3\"\n"
+    result_string = ""
     for category, files in results.items():
         result_string += f"{category}: {', '.join(files)}\n"
 
@@ -126,16 +126,21 @@ def validiere_json(json_string):
 def prompt_by_pdf_text(pdf_text: str, categories_prompt: str) -> str:
     system_prompt = f"""
             Wähle ein passenden Titel für die PDF.
-            Der Titel soll gut für Menschen lesbar sein.
-            Der Titel soll eine Zeitangabe enthalten. 
-            Der Titel muss als Dateiname valide sein.
+            Der Titel soll gut für Menschen lesbar sein!
+            Der Titel soll eine Zeitangabe enthalten!
+            Der Titel muss als Dateiname valide sein!
             Der Titel soll maximal 80 Zeichen lang sein.
+            Die Titel sollen sich an den Beispielen orientieren!
             
             Ordne der PDF eine der folgenden Kategorien zu!
+            Kategorien mit Beispiel Dateien:
             {categories_prompt}
+            ---
+            
+            Wenn keine passende Kategorie vorhanden ist: Sonstiges
             
             Antworte im Json-Format mit den Eigenschaften Titel und Kategorie! 
-            Wenn keine passende Kategorie vorhanden ist, soll eine Warnung ausgegeben werden.
+            Titel und Kategorie müssen korrekt für JSON escaped werden!
             """
 
     # sende prompt an openai
